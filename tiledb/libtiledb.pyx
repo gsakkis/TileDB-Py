@@ -1577,7 +1577,7 @@ cdef class Array(object):
         """
         # Delayed to avoid circular import
         from .multirange_indexing import DataFrameIndexer
-        return DataFrameIndexer(self, use_arrow=None)
+        return DataFrameIndexer(self)
 
     @property
     def last_write_info(self):
@@ -1778,7 +1778,7 @@ cdef class Query(object):
            as a Pandas dataframe."""
         # Delayed to avoid circular import
         from .multirange_indexing import DataFrameIndexer
-        return DataFrameIndexer(self.array, query=self, use_arrow=self.use_arrow)
+        return DataFrameIndexer(self.array, query=self)
 
     def get_stats(self, print_out=True, json=False):
         """Retrieves the stats from a TileDB query.

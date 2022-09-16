@@ -293,16 +293,13 @@ class DataFrameIndexer(_BaseIndexer):
     [] operator uses multi_index semantics.
     """
 
-    def __init__(
-        self,
-        array: Array,
-        query: Optional[Query] = None,
-        use_arrow: Optional[bool] = None,
-    ):
+    def __init__(self, array: Array, query: Optional[Query] = None):
         check_dataframe_deps()
         # we need to use a Query in order to get coords for a dense array
         if not query:
             query = Query(array, coords=True)
+
+        use_arrow = query.use_arrow
         if use_arrow is None:
             use_arrow = pyarrow is not None
         # TODO: currently there is lack of support for Arrow list types. This prevents
