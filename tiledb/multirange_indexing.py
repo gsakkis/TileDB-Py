@@ -161,11 +161,28 @@ class _BaseIndexer(ABC):
         self,
         array: Array,
         query: Optional[Query] = None,
-        use_arrow: bool = False,
         preload_metadata: bool = False,
     ):
         if not isinstance(array, Array):
             raise TypeError("_BaseIndexer expected tiledb.Array")
+
+        use_arrow = query.use_arrow if query is not None else None
+        if use_arrow is None:
+            use_arrow = pyarrow is not None
+        # TODO: currently there is lack of support for Arrow list types. This prevents
+        # multi-value attributes, asides from strings, from being queried properly. Until
+        # list attributes are supported in core, error with a clear message.
+        if use_arrow and query and query.attrs:
+            if any(
+                (attr.isvar or len(attr.dtype) > 1)
+                and attr.dtype not in (np.unicode_, np.bytes_)
+                for attr in map(array.attr, query.attrs)
+            ):
+                raise TileDBError(
+                    "Multi-value attributes are not currently supported when use_arrow=True. "
+                    "This includes all variable-length attributes and fixed-length "
+                    "attributes with more than one value. Use `query(use_arrow=False)`."
+                )
         self.array_ref = weakref.ref(array)
         self.query = query
         self.use_arrow = use_arrow
@@ -298,24 +315,7 @@ class DataFrameIndexer(_BaseIndexer):
         # we need to use a Query in order to get coords for a dense array
         if not query:
             query = Query(array, coords=True)
-
-        use_arrow = query.use_arrow
-        if use_arrow is None:
-            use_arrow = pyarrow is not None
-        # TODO: currently there is lack of support for Arrow list types. This prevents
-        # multi-value attributes, asides from strings, from being queried properly. Until
-        # list attributes are supported in core, error with a clear message.
-        if use_arrow and any(
-            (attr.isvar or len(attr.dtype) > 1)
-            and attr.dtype not in (np.unicode_, np.bytes_)
-            for attr in map(array.attr, query.attrs or ())
-        ):
-            raise TileDBError(
-                "Multi-value attributes are not currently supported when use_arrow=True. "
-                "This includes all variable-length attributes and fixed-length "
-                "attributes with more than one value. Use `query(use_arrow=False)`."
-            )
-        super().__init__(array, query, use_arrow, preload_metadata=True)
+        super().__init__(array, query, preload_metadata=True)
 
     def _run_query(self) -> Union[DataFrame, Table]:
         if self.pyquery is not None:
