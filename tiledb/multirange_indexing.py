@@ -296,7 +296,10 @@ class MultiRangeIndexer(_BaseIndexer):
             return self._empty_results
 
         self.pyquery.submit()
-        result_dict = _get_pyquery_results(self.pyquery, self.array.schema)
+        result_dict = _get_pyquery_results(
+            self.pyquery, self.array.schema, self.use_arrow
+        )
+
         if self.result_shape is not None:
             for arr in result_dict.values():
                 # TODO check/test layout
@@ -474,16 +477,25 @@ def _iter_dim_names(
 
 
 def _get_pyquery_results(
-    pyquery: PyQuery, schema: ArraySchema
+    pyquery: PyQuery, schema: ArraySchema, use_arrow: bool = False
 ) -> Dict[str, np.ndarray]:
     result_dict = OrderedDict()
-    for name, item in pyquery.results().items():
-        if len(item[1]) > 0:
-            arr = pyquery.unpack_buffer(name, item[0], item[1])
-        else:
-            arr = item[0]
-            arr.dtype = schema.attr_or_dim_dtype(name)
-        result_dict[name if name != "__attr" else ""] = arr
+    if use_arrow:
+        table = pyquery._buffers_to_pa_table()
+        for i in range(table.num_columns):
+            name = table.column_names[i]
+            arr = table[i].to_numpy()
+            if not np.issubdtype(arr.dtype, np.object_):
+                arr.dtype = schema.attr_or_dim_dtype(name)
+            result_dict[name if name != "__attr" else ""] = arr
+    else:
+        for name, item in pyquery.results().items():
+            if len(item[1]) > 0:
+                arr = pyquery.unpack_buffer(name, item[0], item[1])
+            else:
+                arr = item[0]
+                arr.dtype = schema.attr_or_dim_dtype(name)
+            result_dict[name if name != "__attr" else ""] = arr
     return result_dict
 
 
